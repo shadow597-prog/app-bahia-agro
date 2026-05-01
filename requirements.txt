@@ -1,2 +1,1 @@
-flet==0.21.0
-gunicorn
+flet==0.21.2
