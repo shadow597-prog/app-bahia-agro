@@ -2,7 +2,7 @@ import flet as ft
 import os
 
 def main(page: ft.Page):
-    page.title = "BAHIA AGRO - Gestão Especializada"
+    page.title = "BAHIA AGRO - Gestão"
     page.theme_mode = ft.ThemeMode.DARK
     page.padding = 20
     
@@ -19,45 +19,47 @@ def main(page: ft.Page):
 
     # --- ABA CACAU ---
     aba_cacau = ft.Column([
-        ft.Icon(ft.icons.CHEVRON_RIGHT, color=COR_CACAU, size=40),
+        ft.Container(height=20),
+        ft.Icon(ft.icons.SPA, color=COR_CACAU, size=50),
         ft.Text("Colheita de Cacau", size=25, weight="bold"),
         ft.Dropdown(
             label="Variedade de Cacau",
             options=[ft.dropdown.Option("PS-1319"), ft.dropdown.Option("CCN-51")]
         ),
-        ft.TextField(label="Peso (Arrobas/Kg)", keyboard_type=ft.KeyboardType.NUMBER),
-        ft.ElevatedButton("Gravar Cacau", bgcolor=COR_CACAU, color="white", on_click=lambda e: salvar(e, "Cacau"))
+        ft.TextField(label="Peso (Kg)", keyboard_type=ft.KeyboardType.NUMBER),
+        ft.ElevatedButton("Gravar Cacau", bgcolor=COR_CACAU, color="white", width=300, on_click=lambda e: salvar(e, "Cacau"))
     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER)
 
     # --- ABA BANANA ---
     aba_banana = ft.Column([
-        ft.Icon(ft.icons.CHEVRON_RIGHT, color=COR_BANANA, size=40),
+        ft.Container(height=20),
+        ft.Icon(ft.icons.LUNCH_DINING, color=COR_BANANA, size=50),
         ft.Text("Colheita de Banana", size=25, weight="bold"),
         ft.Dropdown(
             label="Tipo de Banana",
             options=[ft.dropdown.Option("Prata"), ft.dropdown.Option("Terra")]
         ),
-        ft.TextField(label="Quantidade (Cachos/Kg)", keyboard_type=ft.KeyboardType.NUMBER),
-        ft.ElevatedButton("Gravar Banana", bgcolor=COR_BANANA, color="white", on_click=lambda e: salvar(e, "Banana"))
+        ft.TextField(label="Quantidade", keyboard_type=ft.KeyboardType.NUMBER),
+        ft.ElevatedButton("Gravar Banana", bgcolor=COR_BANANA, color="white", width=300, on_click=lambda e: salvar(e, "Banana"))
     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER)
 
-    # --- ABA DIFERENCIAIS (INFORMAÇÕES) ---
+    # --- ABA DIFERENCIAIS ---
     aba_info = ft.ListView([
         ft.Text("Guia de Variedades", size=25, weight="bold"),
         ft.Divider(),
         
         ft.Text("🍫 CACAU", color=COR_CACAU, weight="bold", size=20),
-        ft.Text("• PS-1319: Alta produtividade e resistência à Vassoura de Bruxa. Ótimo para clima úmido."),
-        ft.Text("• CCN-51: Variedade clonada, muito rústica e com alta carga de gordura na amêndoa."),
+        ft.Text("• PS-1319: Alta produtividade e resistência à Vassoura de Bruxa."),
+        ft.Text("• CCN-51: Amêndoa com alto teor de gordura e planta muito rústica."),
         
-        ft.VerticalDivider(height=20),
+        ft.Container(height=20), # Espaçador
         
         ft.Text("🍌 BANANA", color=COR_BANANA, weight="bold", size=20),
-        ft.Text("• Prata: Maior durabilidade pós-colheita e sabor levemente ácido. Preferida para mesa."),
-        ft.Text("• Terra: Frutos grandes, ideais para cozimento e fritura. Alta demanda comercial."),
-    ], spacing=10, padding=10)
+        ft.Text("• Prata: Sabor doce-acidulado e excelente durabilidade para venda."),
+        ft.Text("• Terra: Tamanho grande, ideal para fritar ou cozinhar."),
+    ], spacing=10, padding=20)
 
-    # --- NAVEGAÇÃO PRINCIPAL ---
+    # --- NAVEGAÇÃO ---
     tabs = ft.Tabs(
         selected_index=0,
         tabs=[
