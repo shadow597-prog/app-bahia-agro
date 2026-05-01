@@ -2,9 +2,10 @@ import flet as ft
 import sqlite3
 import os
 
-# --- BANCO DE DADOS ---
+# --- BANCO DE DADOS (NOVA VERSÃO PARA EVITAR CONFLITO) ---
 def init_db():
-    conn = sqlite3.connect("senna_corporation.db", check_same_thread=False)
+    # Mudamos o nome do arquivo para forçar a criação de um novo banco limpo
+    conn = sqlite3.connect("senna_final_v1.db", check_same_thread=False)
     cursor = conn.cursor()
     cursor.execute('''CREATE TABLE IF NOT EXISTS usuarios 
                       (id INTEGER PRIMARY KEY AUTOINCREMENT, 
@@ -13,6 +14,8 @@ def init_db():
                        cargo TEXT DEFAULT 'pendente')''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS lancamentos 
                       (id INTEGER PRIMARY KEY AUTOINCREMENT, user TEXT, produto TEXT, qtd REAL, valor REAL)''')
+    
+    # Criar o seu acesso de mestre
     try:
         cursor.execute("INSERT INTO usuarios (login, senha, cargo) VALUES (?, ?, ?)", ("shadow", "1234", "ceo"))
     except: pass
@@ -22,138 +25,103 @@ def init_db():
 db = init_db()
 
 def main(page: ft.Page):
-    page.title = "SENNA - CORPORATE"
-    page.bgcolor = "#000000"
+    page.title = "SENNA AGRO"
+    page.bgcolor = "#0b0b0b"
     page.padding = 20
-    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
-
-    estado = {"user": None, "cargo": None}
+    
+    # Estado do app
+    sessao = {"user": None, "cargo": None}
     COR_BANANA = "#EAB308"
-    COR_CACAU = "#8B4513"
-    COR_CARD = "#121212"
 
-    container_principal = ft.Column(horizontal_alignment="center", spacing=20)
-
-    def mostrar_aviso(texto, cor):
-        aviso = ft.SnackBar(ft.Text(texto), bgcolor=cor)
-        page.overlay.append(aviso)
-        aviso.open = True
+    def mostrar_aviso(msg, cor):
+        snack = ft.SnackBar(ft.Text(msg), bgcolor=cor)
+        page.overlay.append(snack)
+        snack.open = True
         page.update()
 
-    # --- LÓGICA DE PROMOÇÃO ---
-    def promover_usuario(id_user, novo_cargo):
+    def promover(id_user, novo_cargo):
         cursor = db.cursor()
         cursor.execute("UPDATE usuarios SET cargo = ? WHERE id = ?", (novo_cargo, id_user))
         db.commit()
-        mostrar_aviso(f"Sucesso! Cargo alterado para {novo_cargo}", "green")
-        montar_dashboard()
+        mostrar_aviso("Permissão concedida!", "green")
+        ir_painel(None)
 
-    # --- INTERFACE: DASHBOARD ---
-    def montar_dashboard():
-        container_principal.controls.clear()
+    # --- TELA: PAINEL PRINCIPAL ---
+    def ir_painel(e):
+        page.controls.clear()
         
-        cabecalho = ft.Row([
-            ft.Column([
-                ft.Text(f"SISTEMA SENNA", size=10, color="#666666"),
-                ft.Text(f"{estado['user'].upper()} ({estado['cargo'].upper()})", size=14, color=COR_BANANA, weight="bold"),
-            ]),
-            ft.Text("SENNA", size=28, weight="bold", italic=True, color=COR_BANANA)
-        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
-
-        # BLOQUEIO DE SEGURANÇA
-        if estado["cargo"] == "pendente":
-            container_principal.controls = [
-                cabecalho,
-                ft.Container(
-                    content=ft.Text("ACESSO RESTRITO\n\nAguarde o CEO Shadow liberar sua entrada.", 
-                                   text_align="center", size=16, color="red"),
-                    padding=40, bgcolor=COR_CARD, border_radius=15
-                )
-            ]
-            page.update()
-            return
-
-        # PAINEL DO CEO (GESTÃO)
-        painel_ceo = ft.Column()
-        if estado["cargo"] == "ceo":
-            cursor = db.cursor()
-            cursor.execute("SELECT id, login, cargo FROM usuarios WHERE cargo != 'ceo'")
-            equipe = cursor.fetchall()
-            
-            lista = ft.Column([ft.Text("GESTÃO DE ACESSOS", weight="bold", size=16)])
-            for p in equipe:
-                lista.controls.append(
-                    ft.Row([
-                        ft.Text(f"{p[1]}", width=100),
-                        ft.ElevatedButton("OPERADOR", on_click=lambda _, idx=p[0]: promover_usuario(idx, "operador"), bgcolor="blue", color="white"),
-                        ft.ElevatedButton("GERENTE", on_click=lambda _, idx=p[0]: promover_usuario(idx, "gerente"), bgcolor="green", color="white"),
-                    ], alignment="center")
-                )
-            painel_ceo.controls = [ft.Container(content=lista, padding=15, bgcolor="#1A1A1A", border_radius=10)]
-
-        # FORMULÁRIO DE PRODUÇÃO
-        in_qtd = ft.TextField(label="Quantidade", border_color=COR_BANANA, width=250)
+        conteudo = ft.Column(horizontal_alignment="center", spacing=20)
         
-        def salvar(prod, preco):
-            if not in_qtd.value: return
-            try:
-                qtd = float(in_qtd.value.replace(",", "."))
-                cursor = db.cursor()
-                cursor.execute("INSERT INTO lancamentos (user, produto, qtd, valor) VALUES (?, ?, ?, ?)", 
-                               (estado["user"], prod, qtd, qtd * preco))
-                db.commit()
-                in_qtd.value = ""
-                mostrar_aviso(f"Registrado por {estado['user']}", "green")
-                page.update()
-            except: mostrar_aviso("Valor inválido", "red")
-
-        form = ft.Container(
-            content=ft.Column([
-                in_qtd,
-                ft.Row([
-                    ft.ElevatedButton("CACAU", on_click=lambda _: salvar("Cacau", 600), bgcolor=COR_CACAU, color="white"),
-                    ft.ElevatedButton("BANANA", on_click=lambda _: salvar("Banana", 50), bgcolor=COR_BANANA, color="black"),
-                ], alignment="center")
-            ], horizontal_alignment="center"),
-            padding=20, bgcolor=COR_CARD, border_radius=15
+        # Boas vindas
+        conteudo.controls.append(
+            ft.Text(f"BEM-VINDO, {sessao['user'].upper()} ({sessao['cargo'].upper()})", 
+                    color=COR_BANANA, weight="bold")
         )
 
-        container_principal.controls = [cabecalho, ft.Divider(color="#222222"), painel_ceo, form]
-        page.update()
+        # Se for PENDENTE, bloqueia tudo
+        if sessao["cargo"] == "pendente":
+            conteudo.controls.append(
+                ft.Container(
+                    content=ft.Text("AGUARDANDO LIBERAÇÃO DO CEO SHADOW", color="red", size=20, text_align="center"),
+                    padding=50, border=ft.border.all(1, "red"), border_radius=10
+                )
+            )
+        
+        # Se for CEO, mostra gestão
+        elif sessao["cargo"] == "ceo":
+            cursor = db.cursor()
+            cursor.execute("SELECT id, login, cargo FROM usuarios WHERE cargo = 'pendente'")
+            pendentes = cursor.fetchall()
+            
+            if pendentes:
+                lista_gestao = ft.Column([ft.Text("USUÁRIOS AGUARDANDO:", weight="bold")])
+                for p in pendentes:
+                    lista_gestao.controls.append(
+                        ft.Row([
+                            ft.Text(p[1]),
+                            ft.ElevatedButton("LIBERAR", on_click=lambda _, idx=p[0]: promover(idx, "operador"))
+                        ], alignment="center")
+                    )
+                conteudo.controls.append(ft.Container(content=lista_gestao, padding=10, bgcolor="#1a1a1a"))
 
-    # --- TELA DE LOGIN ---
-    def login_click(e):
+        # Botão Sair
+        conteudo.controls.append(ft.TextButton("SAIR DO SISTEMA", on_click=lambda _: page.window_destroy()))
+        
+        page.add(conteudo)
+
+    # --- TELA: LOGIN ---
+    def logar(e):
         cursor = db.cursor()
-        cursor.execute("SELECT login, cargo FROM usuarios WHERE login = ? AND senha = ?", (c_user.value, c_pass.value))
+        cursor.execute("SELECT login, cargo FROM usuarios WHERE login = ? AND senha = ?", (ui_user.value, ui_pass.value))
         res = cursor.fetchone()
         if res:
-            estado["user"], estado["cargo"] = res[0], res[1]
-            montar_dashboard()
-        else: mostrar_aviso("Erro: Login ou Senha inválidos", "red")
+            sessao["user"], sessao["cargo"] = res[0], res[1]
+            ir_painel(None)
+        else:
+            mostrar_aviso("Usuário ou senha inválidos", "red")
 
-    def cadastrar_click(e):
+    def cadastrar(e):
         try:
             cursor = db.cursor()
-            cursor.execute("INSERT INTO usuarios (login, senha) VALUES (?, ?)", (c_user.value, c_pass.value))
+            cursor.execute("INSERT INTO usuarios (login, senha) VALUES (?, ?)", (ui_user.value, ui_pass.value))
             db.commit()
-            mostrar_aviso("Pedido enviado! Fale com o CEO.", "blue")
-        except: mostrar_aviso("Este usuário já existe", "red")
+            mostrar_aviso("Cadastro solicitado!", "blue")
+        except:
+            mostrar_aviso("Nome já em uso", "red")
 
-    c_user = ft.TextField(label="Usuário", border_color=COR_BANANA)
-    c_pass = ft.TextField(label="Senha", password=True, border_color=COR_BANANA)
+    ui_user = ft.TextField(label="Usuário", border_color=COR_BANANA)
+    ui_pass = ft.TextField(label="Senha", password=True, border_color=COR_BANANA)
 
-    container_principal.controls = [
-        ft.Text("SENNA AGRO", size=32, weight="bold", color=COR_BANANA, italic=True),
-        ft.Container(
-            content=ft.Column([
-                c_user, c_pass,
-                ft.ElevatedButton("ENTRAR", on_click=login_click, bgcolor=COR_BANANA, color="black", width=250),
-                ft.TextButton("CRIAR NOVA CONTA", on_click=cadastrar_click, color="#666666")
-            ], horizontal_alignment="center"),
-            padding=30, bgcolor=COR_CARD, border_radius=20
-        )
-    ]
-    page.add(container_principal)
+    page.add(
+        ft.Column([
+            ft.Text("SENNA LOGIN", size=30, weight="bold", color=COR_BANANA),
+            ui_user,
+            ui_pass,
+            ft.ElevatedButton("ENTRAR", on_click=logar, bgcolor=COR_BANANA, color="black", width=200),
+            ft.TextButton("SOLICITAR ACESSO", on_click=cadastrar)
+        ], horizontal_alignment="center")
+    )
 
 if __name__ == "__main__":
-    ft.app(target=main, view=ft.AppView.WEB_BROWSER, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+    port = int(os.environ.get("PORT", 8080))
+    ft.app(target=main, view=ft.AppView.WEB_BROWSER, host="0.0.0.0", port=port)
