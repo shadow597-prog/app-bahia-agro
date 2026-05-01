@@ -2,20 +2,14 @@ import flet as ft
 import sqlite3
 import os
 
-# --- BANCO DE DADOS (NOVA VERSÃO PARA EVITAR CONFLITO) ---
+# --- BANCO DE DADOS ---
 def init_db():
-    # Mudamos o nome do arquivo para forçar a criação de um novo banco limpo
     conn = sqlite3.connect("senna_final_v1.db", check_same_thread=False)
     cursor = conn.cursor()
     cursor.execute('''CREATE TABLE IF NOT EXISTS usuarios 
-                      (id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                       login TEXT UNIQUE, 
-                       senha TEXT, 
-                       cargo TEXT DEFAULT 'pendente')''')
+                      (id INTEGER PRIMARY KEY AUTOINCREMENT, login TEXT UNIQUE, senha TEXT, cargo TEXT DEFAULT 'pendente')''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS lancamentos 
-                      (id INTEGER PRIMARY KEY AUTOINCREMENT, user TEXT, produto TEXT, qtd REAL, valor REAL)''')
-    
-    # Criar o seu acesso de mestre
+                      (id INTEGER PRIMARY KEY AUTOINCREMENT, user TEXT, produto TEXT, qtd REAL, valor REAL, data TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     try:
         cursor.execute("INSERT INTO usuarios (login, senha, cargo) VALUES (?, ?, ?)", ("shadow", "1234", "ceo"))
     except: pass
@@ -25,13 +19,15 @@ def init_db():
 db = init_db()
 
 def main(page: ft.Page):
-    page.title = "SENNA AGRO"
-    page.bgcolor = "#0b0b0b"
+    page.title = "SENNA AGRO - GESTÃO"
+    page.bgcolor = "#000000"
     page.padding = 20
+    page.theme_mode = ft.ThemeMode.DARK
     
-    # Estado do app
     sessao = {"user": None, "cargo": None}
     COR_BANANA = "#EAB308"
+    COR_CACAU = "#8B4513"
+    COR_CARD = "#121212"
 
     def mostrar_aviso(msg, cor):
         snack = ft.SnackBar(ft.Text(msg), bgcolor=cor)
@@ -44,84 +40,133 @@ def main(page: ft.Page):
         cursor.execute("UPDATE usuarios SET cargo = ? WHERE id = ?", (novo_cargo, id_user))
         db.commit()
         mostrar_aviso("Permissão concedida!", "green")
-        ir_painel(None)
+        montar_sistema()
 
-    # --- TELA: PAINEL PRINCIPAL ---
-    def ir_painel(e):
+    # --- FUNÇÃO PRINCIPAL DA INTERFACE ---
+    def montar_sistema():
         page.controls.clear()
-        
-        conteudo = ft.Column(horizontal_alignment="center", spacing=20)
-        
-        # Boas vindas
-        conteudo.controls.append(
-            ft.Text(f"BEM-VINDO, {sessao['user'].upper()} ({sessao['cargo'].upper()})", 
-                    color=COR_BANANA, weight="bold")
+
+        # 1. CABEÇALHO
+        header = ft.Row([
+            ft.Column([
+                ft.Text("SISTEMA SENNA", size=10, color="#666666"),
+                ft.Text(f"{sessao['user'].upper()} ({sessao['cargo'].upper()})", size=16, color=COR_BANANA, weight="bold"),
+            ]),
+            ft.IconButton(ft.icons.LOGOUT, on_click=lambda _: page.window_destroy())
+        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+
+        # 2. BLOQUEIO PARA PENDENTES
+        if sessao["cargo"] == "pendente":
+            page.add(header, ft.Divider(), ft.Container(
+                content=ft.Text("🔒 ACESSO PENDENTE\nO CEO Shadow precisa liberar seu usuário.", 
+                               text_align="center", size=18, color="red"),
+                padding=50, alignment=ft.alignment.center
+            ))
+            return
+
+        # 3. CONTEÚDO PARA OPERADORES, GERENTES E CEO
+        # Inputs de Venda
+        in_qtd = ft.TextField(label="Quantidade", border_color=COR_BANANA, suffix_text="Und/@/Kg", width=300)
+        lista_vendas = ft.Column(spacing=5)
+
+        def salvar(prod, preco, cor):
+            if not in_qtd.value: return
+            try:
+                qtd = float(in_qtd.value.replace(",", "."))
+                total = qtd * preco
+                cursor = db.cursor()
+                cursor.execute("INSERT INTO lancamentos (user, produto, qtd, valor) VALUES (?, ?, ?, ?)", 
+                               (sessao["user"], prod, qtd, total))
+                db.commit()
+                in_qtd.value = ""
+                mostrar_aviso(f"Registrado: R$ {total:.2f}", cor)
+                atualizar_historico()
+            except: mostrar_aviso("Erro no valor", "red")
+
+        def atualizar_historico():
+            cursor = db.cursor()
+            cursor.execute("SELECT user, produto, qtd, valor FROM lancamentos ORDER BY id DESC LIMIT 5")
+            vendas = cursor.fetchall()
+            lista_vendas.controls = [ft.Text("ÚLTIMOS LANÇAMENTOS", weight="bold", size=12, color="#666666")]
+            for v in vendas:
+                lista_vendas.controls.append(
+                    ft.Text(f"👤 {v[0]} | {v[1]}: {v[2]} (R$ {v[3]:.2f})", size=13)
+                )
+            page.update()
+
+        # Seção de Botões de Produção
+        botoes_producao = ft.Container(
+            content=ft.Column([
+                in_qtd,
+                ft.Row([
+                    ft.ElevatedButton("CACAU", on_click=lambda _: salvar("Cacau", 600, COR_CACAU), bgcolor=COR_CACAU, color="white"),
+                    ft.ElevatedButton("BANANA", on_click=lambda _: salvar("Banana", 50, COR_BANANA), bgcolor=COR_BANANA, color="black"),
+                ], alignment="center"),
+            ], horizontal_alignment="center"),
+            padding=20, bgcolor=COR_CARD, border_radius=15
         )
 
-        # Se for PENDENTE, bloqueia tudo
-        if sessao["cargo"] == "pendente":
-            conteudo.controls.append(
-                ft.Container(
-                    content=ft.Text("AGUARDANDO LIBERAÇÃO DO CEO SHADOW", color="red", size=20, text_align="center"),
-                    padding=50, border=ft.border.all(1, "red"), border_radius=10
-                )
-            )
-        
-        # Se for CEO, mostra gestão
-        elif sessao["cargo"] == "ceo":
+        # 4. ÁREA DO CEO (GESTÃO DE PESSOAS)
+        area_ceo = ft.Column()
+        if sessao["cargo"] == "ceo":
             cursor = db.cursor()
             cursor.execute("SELECT id, login, cargo FROM usuarios WHERE cargo = 'pendente'")
             pendentes = cursor.fetchall()
-            
             if pendentes:
-                lista_gestao = ft.Column([ft.Text("USUÁRIOS AGUARDANDO:", weight="bold")])
+                lista_p = ft.Column([ft.Text("GESTÃO DE EQUIPE", weight="bold", color=COR_BANANA)])
                 for p in pendentes:
-                    lista_gestao.controls.append(
-                        ft.Row([
-                            ft.Text(p[1]),
-                            ft.ElevatedButton("LIBERAR", on_click=lambda _, idx=p[0]: promover(idx, "operador"))
-                        ], alignment="center")
-                    )
-                conteudo.controls.append(ft.Container(content=lista_gestao, padding=10, bgcolor="#1a1a1a"))
+                    lista_p.controls.append(ft.Row([
+                        ft.Text(f"Aprovar {p[1]}?"),
+                        ft.TextButton("LIBERAR", on_click=lambda _, idx=p[0]: promover(idx, "operador"))
+                    ]))
+                area_ceo.controls = [ft.Container(content=lista_p, padding=15, bgcolor="#1a1a1a", border_radius=10)]
 
-        # Botão Sair
-        conteudo.controls.append(ft.TextButton("SAIR DO SISTEMA", on_click=lambda _: page.window_destroy()))
-        
-        page.add(conteudo)
+        # Montagem final
+        page.add(
+            header,
+            ft.Divider(color="#222222"),
+            area_ceo,
+            ft.Text("LANÇAMENTO DE SAFRA", weight="bold"),
+            botoes_producao,
+            ft.Divider(color="#222222"),
+            lista_vendas
+        )
+        atualizar_historico()
 
-    # --- TELA: LOGIN ---
+    # --- TELA DE LOGIN ---
     def logar(e):
         cursor = db.cursor()
         cursor.execute("SELECT login, cargo FROM usuarios WHERE login = ? AND senha = ?", (ui_user.value, ui_pass.value))
         res = cursor.fetchone()
         if res:
             sessao["user"], sessao["cargo"] = res[0], res[1]
-            ir_painel(None)
-        else:
-            mostrar_aviso("Usuário ou senha inválidos", "red")
+            montar_sistema()
+        else: mostrar_aviso("Acesso Negado", "red")
 
     def cadastrar(e):
         try:
             cursor = db.cursor()
             cursor.execute("INSERT INTO usuarios (login, senha) VALUES (?, ?)", (ui_user.value, ui_pass.value))
             db.commit()
-            mostrar_aviso("Cadastro solicitado!", "blue")
-        except:
-            mostrar_aviso("Nome já em uso", "red")
+            mostrar_aviso("Solicitação enviada ao CEO!", "blue")
+        except: mostrar_aviso("Usuário já existe", "red")
 
     ui_user = ft.TextField(label="Usuário", border_color=COR_BANANA)
     ui_pass = ft.TextField(label="Senha", password=True, border_color=COR_BANANA)
 
     page.add(
         ft.Column([
-            ft.Text("SENNA LOGIN", size=30, weight="bold", color=COR_BANANA),
-            ui_user,
-            ui_pass,
-            ft.ElevatedButton("ENTRAR", on_click=logar, bgcolor=COR_BANANA, color="black", width=200),
-            ft.TextButton("SOLICITAR ACESSO", on_click=cadastrar)
+            ft.Text("SENNA AGRO", size=32, weight="bold", italic=True, color=COR_BANANA),
+            ft.Container(
+                content=ft.Column([
+                    ui_user, ui_pass,
+                    ft.ElevatedButton("ENTRAR", on_click=logar, bgcolor=COR_BANANA, color="black", width=250),
+                    ft.TextButton("SOLICITAR NOVO ACESSO", on_click=cadastrar)
+                ], horizontal_alignment="center"),
+                padding=30, bgcolor=COR_CARD, border_radius=20
+            )
         ], horizontal_alignment="center")
     )
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
-    ft.app(target=main, view=ft.AppView.WEB_BROWSER, host="0.0.0.0", port=port)
+    ft.app(target=main, view=ft.AppView.WEB_BROWSER, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
