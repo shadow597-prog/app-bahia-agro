@@ -19,9 +19,8 @@ def init_db():
 db = init_db()
 
 def main(page: ft.Page):
-    page.title = "SENNA - GESTÃO RURAL"
+    page.title = "SENNA - GESTÃO"
     page.bgcolor = "#000000"
-    page.padding = 10
     
     sessao = {"user": None, "cargo": None}
     COR_BANANA = "#EAB308"
@@ -34,17 +33,16 @@ def main(page: ft.Page):
         snack.open = True
         page.update()
 
-    # --- LÓGICA DE GESTÃO ---
     def alterar_status(id_user, novo_cargo):
         cursor = db.cursor()
         cursor.execute("UPDATE usuarios SET cargo = ? WHERE id = ?", (novo_cargo, id_user))
         db.commit()
-        mostrar_aviso("Atualizado com sucesso!", "green")
+        mostrar_aviso("Status atualizado!", "green")
         montar_sistema()
 
-    # --- CONTEÚDO DAS ABAS ---
+    # --- ABAS ---
     def criar_aba_vendas():
-        in_qtd = ft.TextField(label="Quantidade", border_color=COR_BANANA, width=300)
+        in_qtd = ft.TextField(label="Quantidade", border_color=COR_BANANA, width=280)
         
         def salvar(prod, preco, cor):
             if not in_qtd.value: return
@@ -55,11 +53,11 @@ def main(page: ft.Page):
                                (sessao["user"], prod, qtd, qtd * preco))
                 db.commit()
                 in_qtd.value = ""
-                mostrar_aviso(f"Registrado!", cor)
-            except: mostrar_aviso("Erro no valor", "red")
+                mostrar_aviso(f"Venda de {prod} salva!", cor)
+            except: mostrar_aviso("Erro no número", "red")
 
         return ft.Column([
-            ft.Text("LANÇAR PRODUÇÃO", size=18, weight="bold"),
+            ft.Text("REGISTRAR PRODUÇÃO", size=18, weight="bold", color=COR_BANANA),
             ft.Container(
                 content=ft.Column([
                     in_qtd,
@@ -68,34 +66,30 @@ def main(page: ft.Page):
                         ft.ElevatedButton("BANANA", on_click=lambda _: salvar("Banana", 50, COR_BANANA), bgcolor=COR_BANANA, color="black"),
                     ], alignment="center"),
                 ], horizontal_alignment="center"),
-                padding=20, bgcolor=COR_CARD, border_radius=15
+                padding=20, bgcolor=COR_CARD, border_radius=10
             )
-        ])
+        ], scroll=ft.ScrollMode.ALWAYS)
 
     def criar_aba_equipe():
         cursor = db.cursor()
-        # Solicitações Pendentes
         cursor.execute("SELECT id, login FROM usuarios WHERE cargo = 'pendente'")
         pendentes = cursor.fetchall()
-        # Funcionários Ativos
         cursor.execute("SELECT login, cargo FROM usuarios WHERE cargo != 'pendente'")
         ativos = cursor.fetchall()
 
-        col_pendentes = ft.Column([ft.Text("SOLICITAÇÕES DE CONTA", color=COR_BANANA, weight="bold")])
+        col = ft.Column([ft.Text("SOLICITAÇÕES", weight="bold")])
         for p in pendentes:
-            col_pendentes.controls.append(ft.Row([
-                ft.Text(p[1], width=100),
-                ft.ElevatedButton("ACEITAR", on_click=lambda _, idx=p[0]: alterar_status(idx, "operador"), bgcolor="green", color="white")
+            col.controls.append(ft.Row([
+                ft.Text(p[1]),
+                ft.TextButton("ACEITAR", on_click=lambda _, idx=p[0]: alterar_status(idx, "operador"))
             ]))
-
-        col_ativos = ft.Column([ft.Text("LISTA DE FUNCIONÁRIOS", color=COR_BANANA, weight="bold")])
+        
+        col.controls.append(ft.Divider())
+        col.controls.append(ft.Text("FUNCIONÁRIOS ATIVOS", weight="bold"))
         for a in ativos:
-            col_ativos.controls.append(ft.Row([
-                ft.Icon(ft.icons.PERSON, size=16),
-                ft.Text(f"{a[0].upper()} - Cargo: {a[1]}")
-            ]))
-
-        return ft.Column([col_pendentes, ft.Divider(), col_ativos], scroll=ft.ScrollMode.ALWAYS)
+            col.controls.append(ft.Text(f"• {a[0]} ({a[1]})"))
+        
+        return col
 
     def criar_aba_planilha():
         cursor = db.cursor()
@@ -104,64 +98,47 @@ def main(page: ft.Page):
 
         tabela = ft.DataTable(
             columns=[
-                ft.DataColumn(ft.Text("Funcionário")),
-                ft.DataColumn(ft.Text("Produto")),
+                ft.DataColumn(ft.Text("Quem")),
+                ft.DataColumn(ft.Text("Item")),
                 ft.DataColumn(ft.Text("Qtd")),
-                ft.DataColumn(ft.Text("Total (R$)")),
-                ft.DataColumn(ft.Text("Data")),
+                ft.DataColumn(ft.Text("Total")),
             ],
-            rows=[]
+            rows=[
+                ft.DataRow(cells=[
+                    ft.DataCell(ft.Text(str(d[0]))),
+                    ft.DataCell(ft.Text(str(d[1]))),
+                    ft.DataCell(ft.Text(str(d[2]))),
+                    ft.DataCell(ft.Text(f"R${d[3]:.2f}")),
+                ]) for d in dados
+            ]
         )
+        return ft.Column([tabela], scroll=ft.ScrollMode.ALWAYS)
 
-        for d in dados:
-            tabela.rows.append(ft.DataRow(cells=[
-                ft.DataCell(ft.Text(str(d[0]))),
-                ft.DataCell(ft.Text(str(d[1]))),
-                ft.DataCell(ft.Text(str(d[2]))),
-                ft.DataCell(ft.Text(f"{d[3]:.2f}")),
-                ft.DataCell(ft.Text(str(d[4])[:10])),
-            ]))
-
-        return ft.Column([
-            ft.Text("PLANILHA DE MOVIMENTAÇÃO", size=18, weight="bold"),
-            ft.Container(content=tabela, border_radius=10, bgcolor=COR_CARD)
-        ], scroll=ft.ScrollMode.ALWAYS)
-
-    # --- MONTAGEM DO SISTEMA ---
     def montar_sistema():
         page.controls.clear()
         
-        # Cabeçalho
         header = ft.Row([
-            ft.Text("SENNA CORPORATE", size=20, weight="bold", italic=True, color=COR_BANANA),
+            ft.Text("SENNA", size=20, weight="bold", color=COR_BANANA),
             ft.TextButton("SAIR", on_click=lambda _: page.window_destroy())
-        ], alignment="center")
+        ], alignment="spaceBetween")
 
         if sessao["cargo"] == "pendente":
-            page.add(header, ft.Container(content=ft.Text("🔒 AGUARDANDO LIBERAÇÃO", size=20), padding=50))
+            page.add(header, ft.Text("Aguarde o Shadow liberar seu acesso.", color="red"))
             return
 
-        # Definição das Abas
-        abas = [
-            ft.Tab(text="VENDAS", content=criar_aba_vendas()),
+        # Ajuste aqui: Usando 'label' em vez de 'text' para compatibilidade
+        abas_lista = [
+            ft.Tab(label="VENDAS", content=criar_aba_vendas()),
         ]
 
-        # Só o Shadow vê as abas de Equipe e Planilha
         if sessao["cargo"] == "ceo":
-            abas.append(ft.Tab(text="EQUIPE", content=criar_aba_equipe()))
-            abas.append(ft.Tab(text="PLANILHA", content=criar_aba_planilha()))
+            abas_lista.append(ft.Tab(label="EQUIPE", content=criar_aba_equipe()))
+            abas_lista.append(ft.Tab(label="PLANILHA", content=criar_aba_planilha()))
 
-        t = ft.Tabs(
-            selected_index=0,
-            animation_duration=300,
-            tabs=abas,
-            expand=1,
-        )
-
-        page.add(header, t)
+        page.add(header, ft.Tabs(tabs=abas_lista, expand=1))
         page.update()
 
-    # --- TELA DE LOGIN ---
+    # --- LOGIN ---
     def logar(e):
         cursor = db.cursor()
         cursor.execute("SELECT login, cargo FROM usuarios WHERE login = ? AND senha = ?", (ui_user.value, ui_pass.value))
@@ -169,24 +146,24 @@ def main(page: ft.Page):
         if res:
             sessao["user"], sessao["cargo"] = res[0], res[1]
             montar_sistema()
-        else: mostrar_aviso("Acesso negado", "red")
+        else: mostrar_aviso("Erro de login", "red")
 
     def cadastrar(e):
         try:
             cursor = db.cursor()
             cursor.execute("INSERT INTO usuarios (login, senha) VALUES (?, ?)", (ui_user.value, ui_pass.value))
             db.commit()
-            mostrar_aviso("Solicitado! Fale com o Shadow.", "blue")
+            mostrar_aviso("Pedido enviado!", "blue")
         except: mostrar_aviso("Usuário já existe", "red")
 
-    ui_user = ft.TextField(label="Usuário", border_color=COR_BANANA)
+    ui_user = ft.TextField(label="Login", border_color=COR_BANANA)
     ui_pass = ft.TextField(label="Senha", password=True, border_color=COR_BANANA)
 
     page.add(ft.Column([
-        ft.Text("SENNA LOGIN", size=30, color=COR_BANANA, weight="bold"),
+        ft.Text("SENNA AGRO", size=30, color=COR_BANANA, weight="bold"),
         ui_user, ui_pass,
         ft.ElevatedButton("ENTRAR", on_click=logar, bgcolor=COR_BANANA, color="black", width=250),
-        ft.TextButton("PEDIR ACESSO", on_click=cadastrar)
+        ft.TextButton("CRIAR CONTA", on_click=cadastrar)
     ], horizontal_alignment="center"))
 
 if __name__ == "__main__":
