@@ -6,12 +6,11 @@ import requests
 URL_PLANILHA = "COLE_SEU_LINK_AQUI"
 
 def main(page: ft.Page):
-    page.title = "BAHIA AGRO v4.0"
+    page.title = "BAHIA AGRO v4.1"
     page.theme_mode = ft.ThemeMode.DARK
     page.padding = 30
-    page.bgcolor = "#0f172a" # Fundo escuro profissional
+    page.bgcolor = "#0f172a" 
     
-    # Cores baseadas no seu design
     COR_CACAU = "#8B4513"
     COR_BANANA = "#EAB308"
     COR_FUNDO_CARD = "#1e293b"
@@ -23,7 +22,6 @@ def main(page: ft.Page):
             page.update()
             return
 
-        # Envio para planilha se houver URL
         if URL_PLANILHA != "COLE_SEU_LINK_AQUI":
             try:
                 dados = {"fruta": cultura, "variedade": var, "peso": f"{qtd} {uni}"}
@@ -31,26 +29,17 @@ def main(page: ft.Page):
             except:
                 pass
         
-        page.snack_bar = ft.SnackBar(ft.Text(f"✅ {cultura} {var} gravado com sucesso!"), bgcolor="green")
+        page.snack_bar = ft.SnackBar(ft.Text(f"✅ {cultura} {var} gravado!"), bgcolor="green")
         page.snack_bar.open = True
         page.update()
 
     # --- UI: CABEÇALHO ---
-    header = ft.Column([
-        ft.Text("SISTEMA GESTÃO DE SAFRA", size=32, weight="bold", color="white"),
-    ], horizontal_alignment="center")
+    header = ft.Text("SISTEMA GESTÃO DE SAFRA", size=32, weight="bold", color="white", text_align="center")
 
     # --- ABA: NOVO LANÇAMENTO ---
-    # Coluna Cacau
-    var_cacau = ft.Dropdown(label="Variedade", border_color="#4b5563", options=[
-        ft.dropdown.Option("PS-1319"), ft.dropdown.Option("CCN-51"), 
-        ft.dropdown.Option("Comum"), ft.dropdown.Option("Parazinho")
-    ])
-    proc_cacau = ft.Dropdown(label="Processo", border_color="#4b5563", options=[
-        ft.dropdown.Option("Secado ao Sol"), ft.dropdown.Option("Fermentado"),
-        ft.dropdown.Option("In Natura"), ft.dropdown.Option("Torrado (Nibs)")
-    ])
-    qtd_cacau = ft.TextField(label="Quantidade em @", border_color="#4b5563", keyboard_type=ft.KeyboardType.NUMBER)
+    var_cacau = ft.Dropdown(label="Variedade", options=[ft.dropdown.Option("PS-1319"), ft.dropdown.Option("CCN-51")])
+    proc_cacau = ft.Dropdown(label="Processo", options=[ft.dropdown.Option("Secado ao Sol"), ft.dropdown.Option("Fermentado")])
+    qtd_cacau = ft.TextField(label="Quantidade em @", keyboard_type=ft.KeyboardType.NUMBER)
     
     card_cacau = ft.Container(
         content=ft.Column([
@@ -62,24 +51,13 @@ def main(page: ft.Page):
         padding=30, border_radius=15, bgcolor=COR_FUNDO_CARD, border=ft.border.all(1, COR_CACAU), expand=True
     )
 
-    # Coluna Banana
-    var_banana = ft.Dropdown(label="Variedade", border_color="#4b5563", options=[
-        ft.dropdown.Option("Prata"), ft.dropdown.Option("Nanica"), 
-        ft.dropdown.Option("Terra"), ft.dropdown.Option("Maçã")
-    ])
-    tipo_banana = ft.Dropdown(label="Tipo", border_color="#4b5563", options=[
-        ft.dropdown.Option("De Primeira"), ft.dropdown.Option("De Segunda"),
-        ft.dropdown.Option("Madura"), ft.dropdown.Option("Verde")
-    ])
+    var_banana = ft.Dropdown(label="Variedade", options=[ft.dropdown.Option("Prata"), ft.dropdown.Option("Nanica"), ft.dropdown.Option("Terra")])
+    tipo_banana = ft.Dropdown(label="Tipo", options=[ft.dropdown.Option("De Primeira"), ft.dropdown.Option("De Segunda")])
     uni_banana = ft.SegmentedButton(
         selected={"Cento"},
-        segments=[
-            ft.Segment(value="Kg", label=ft.Text("Kg")),
-            ft.Segment(value="Cento", label=ft.Text("Cento")),
-            ft.Segment(value="Caixa", label=ft.Text("Caixa"))
-        ]
+        segments=[ft.Segment(value="Kg", label=ft.Text("Kg")), ft.Segment(value="Cento", label=ft.Text("Cento")), ft.Segment(value="Caixa", label=ft.Text("Caixa"))]
     )
-    qtd_banana = ft.TextField(label="Quantidade", border_color="#4b5563", keyboard_type=ft.KeyboardType.NUMBER)
+    qtd_banana = ft.TextField(label="Quantidade", keyboard_type=ft.KeyboardType.NUMBER)
 
     card_banana = ft.Container(
         content=ft.Column([
@@ -91,44 +69,33 @@ def main(page: ft.Page):
         padding=30, border_radius=15, bgcolor=COR_FUNDO_CARD, border=ft.border.all(1, COR_BANANA), expand=True
     )
 
-    aba_lancamento = ft.Row([card_cacau, card_banana], spacing=20, alignment="center")
-
     # --- ABA: CONHECIMENTO ---
-    guia_texto = """
->>> GUIA DE VARIEDADES - GESTÃO AGRO BAHIA <<<
+    guia_texto = ft.Text(""">>> GUIA DE VARIEDADES - GESTÃO AGRO BAHIA <<<
 
 [ CACAU ]
-----------------------------------------------------------
-* PS-1319: Alta produtividade e amêndoas pesadas. Resistente.
-* CCN-51:  O 'trator' do cacau. Alta manteiga, exige fermentação fria.
-* COMUM:   Sabor chocolate intenso. Cultivado na sombra (Cabruca).
-* PARAZINHO: Variedade fina, amêndoas de alto sabor aromático.
+* PS-1319: Alta produtividade e amêndoas pesadas.
+* CCN-51:  O 'trator' do cacau. Exige fermentação fria.
 
 [ BANANA ]
-----------------------------------------------------------
-* PRATA:   Melhor durabilidade pós-colheita. Equilíbrio doce/ácido.
-* NANICA:  Porte baixo, muito doce. Ótima para indústria de doces.
-* TERRA:   Grande, para cozinhar/fritar. Alto valor de mercado.
-* MAÇÃ:    Sabor premium, aroma de maçã. Rara e valorizada.
-    """
-    aba_conhecimento = ft.Container(
-        content=ft.Text(guia_texto, font_family="monospace", size=16),
-        padding=40, bgcolor=COR_FUNDO_CARD, border_radius=15, border=ft.border.all(1, "#334155")
-    )
+* PRATA:   Melhor durabilidade pós-colheita.
+* TERRA:   Grande, para cozinhar/fritar. Alto valor.""", font_family="monospace", size=16)
 
-    # --- NAVEGAÇÃO POR ABAS (CORRIGIDO PARA O SITE) ---
+    # --- NAVEGAÇÃO POR ABAS (VERSÃO 2026 SEM ERRO) ---
+    aba1_content = ft.Container(ft.Text("Planilhas em breve...", size=20), padding=50)
+    aba2_content = ft.Row([card_cacau, card_banana], spacing=20, alignment="center")
+    aba3_content = ft.Container(guia_texto, padding=40, bgcolor=COR_FUNDO_CARD, border_radius=15)
+
     tabs = ft.Tabs(
         selected_index=1,
-        animation_duration=300,
         tabs=[
-            ft.Tab(label="📊 Planilhas", content=ft.Container(ft.Text("Visualização de planilhas em breve...", size=20), padding=50)),
-            ft.Tab(label="➕ Novo Lançamento", content=aba_lancamento),
-            ft.Tab(label="📖 Conhecimento", content=aba_conhecimento),
+            ft.Tab(label="📊 Planilhas", content=aba1_content),
+            ft.Tab(label="➕ Novo Lançamento", content=aba2_content),
+            ft.Tab(label="📖 Conhecimento", content=aba3_content),
         ],
         expand=1
     )
 
-    page.add(header, ft.Container(height=20), tabs)
+    page.add(ft.Center(header), ft.Container(height=20), tabs)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
