@@ -1,9 +1,8 @@
 import flet as ft
 import os
-import requests
 
 def main(page: ft.Page):
-    page.title = "BAHIA AGRO v4.2"
+    page.title = "BAHIA AGRO v4.3"
     page.theme_mode = ft.ThemeMode.DARK
     page.padding = 30
     page.bgcolor = "#0f172a" 
@@ -12,20 +11,14 @@ def main(page: ft.Page):
     COR_BANANA = "#EAB308"
     COR_FUNDO_CARD = "#1e293b"
 
-    # --- ABA 1: PLANILHAS ---
-    conteudo_planilha = ft.Container(
-        content=ft.Text("As planilhas serão exibidas aqui em breve.", size=20),
-        padding=50
-    )
-
-    # --- ABA 2: LANÇAMENTO ---
-    # (Criando os elementos primeiro para não dar erro de referência)
+    # --- CONTEÚDOS ---
+    # Conteúdo da Aba Lançamento
     card_cacau = ft.Container(
         content=ft.Column([
             ft.Text("LANÇAR CACAU", color=COR_CACAU, size=20, weight="bold"),
-            ft.Dropdown(label="Variedade", options=[ft.dropdown.Option("PS-1319"), ft.dropdown.Option("CCN-51")]),
-            ft.TextField(label="Quantidade em @", keyboard_type=ft.KeyboardType.NUMBER),
-            ft.ElevatedButton("GRAVAR CACAU", bgcolor=COR_CACAU, color="white", width=400)
+            ft.Dropdown(label="Variedade", options=[ft.dropdown.Option("PS-1319")]),
+            ft.TextField(label="Quantidade em @"),
+            ft.ElevatedButton("GRAVAR CACAU", bgcolor=COR_CACAU, color="white", width=300)
         ], horizontal_alignment="center", spacing=15),
         padding=30, border_radius=15, bgcolor=COR_FUNDO_CARD, border=ft.border.all(1, COR_CACAU)
     )
@@ -33,41 +26,50 @@ def main(page: ft.Page):
     card_banana = ft.Container(
         content=ft.Column([
             ft.Text("LANÇAR BANANA", color=COR_BANANA, size=20, weight="bold"),
-            ft.Dropdown(label="Variedade", options=[ft.dropdown.Option("Prata"), ft.dropdown.Option("Terra")]),
-            ft.TextField(label="Quantidade", keyboard_type=ft.KeyboardType.NUMBER),
-            ft.ElevatedButton("GRAVAR BANANA", bgcolor=COR_BANANA, color="black", width=400)
+            ft.Dropdown(label="Variedade", options=[ft.dropdown.Option("Prata")]),
+            ft.TextField(label="Quantidade"),
+            ft.ElevatedButton("GRAVAR BANANA", bgcolor=COR_BANANA, color="black", width=300)
         ], horizontal_alignment="center", spacing=15),
         padding=30, border_radius=15, bgcolor=COR_FUNDO_CARD, border=ft.border.all(1, COR_BANANA)
     )
 
-    conteudo_lancamento = ft.Row([card_cacau, card_banana], spacing=20, alignment="center")
+    aba_lancamento = ft.Row([card_cacau, card_banana], spacing=20, alignment="center")
 
-    # --- ABA 3: CONHECIMENTO ---
-    conteudo_conhecimento = ft.Container(
+    # Conteúdo da Aba Conhecimento
+    aba_conhecimento = ft.Container(
         content=ft.Text(">>> GUIA AGRO BAHIA <<<\n\nCacau: PS-1319, CCN-51\nBanana: Prata, Terra", font_family="monospace"),
         padding=40, bgcolor=COR_FUNDO_CARD, border_radius=15
     )
 
-    # --- CONFIGURAÇÃO DAS ABAS (MÉTODO COMPATÍVEL) ---
-    aba_planilha = ft.Tab(label="📊 Planilhas")
-    aba_planilha.content = conteudo_planilha
+    # --- SISTEMA DE NAVEGAÇÃO (MÉTODO ALTERNATIVO) ---
+    # Se o 'Tabs' está dando erro, vamos usar um seletor simples que funciona sempre
+    exibicao = ft.Container(content=aba_lancamento, expand=True)
 
-    aba_lancamento = ft.Tab(label="➕ Novo Lançamento")
-    aba_lancamento.content = conteudo_lancamento
+    def mudar_aba(e):
+        if e.control.selected_index == 0:
+            exibicao.content = ft.Text("Planilhas em breve...", size=20)
+        elif e.control.selected_index == 1:
+            exibicao.content = aba_lancamento
+        else:
+            exibicao.content = aba_conhecimento
+        page.update()
 
-    aba_conhecimento = ft.Tab(label="📖 Conhecimento")
-    aba_conhecimento.content = conteudo_conhecimento
-
-    tabs = ft.Tabs(
+    nav = ft.NavigationBar(
+        destinations=[
+            ft.NavigationDestination(icon=ft.icons.TABLE_CHART, label="Planilhas"),
+            ft.NavigationDestination(icon=ft.icons.ADD_CIRCLE, label="Lançamento"),
+            ft.NavigationDestination(icon=ft.icons.BOOK, label="Conhecimento"),
+        ],
         selected_index=1,
-        tabs=[aba_planilha, aba_lancamento, aba_conhecimento],
-        expand=1
+        on_change=mudar_aba,
+        bgcolor="#1e293b"
     )
 
     page.add(
         ft.Center(ft.Text("SISTEMA GESTÃO DE SAFRA", size=30, weight="bold")),
         ft.Container(height=20),
-        tabs
+        exibicao,
+        nav
     )
 
 if __name__ == "__main__":
