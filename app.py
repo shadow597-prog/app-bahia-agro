@@ -20,19 +20,24 @@ db = init_db()
 
 def main(page: ft.Page):
     page.bgcolor = "#000000"
+    page.padding = 15
     sessao = {"user": None, "cargo": None}
     COR_BANANA = "#EAB308"
+    COR_CACAU = "#8B4513"
 
-    def alterar_status(id_user, novo_cargo):
-        cursor = db.cursor()
-        cursor.execute("UPDATE usuarios SET cargo = ? WHERE id = ?", (novo_cargo, id_user))
-        db.commit()
-        montar_sistema()
+    def mostrar_aviso(msg, cor):
+        snack = ft.SnackBar(ft.Text(msg), bgcolor=cor)
+        page.overlay.append(snack)
+        snack.open = True
+        page.update()
 
-    # --- GERADORES DE CONTEÚDO ---
+    # --- TELAS (CONTAINERS) ---
+    conteudo_principal = ft.Column(expand=True)
+
     def view_vendas():
-        in_qtd = ft.TextField(label="Qtd", border_color=COR_BANANA)
+        in_qtd = ft.TextField(label="Quantidade", border_color=COR_BANANA, width=250)
         def salvar(p, pr):
+            if not in_qtd.value: return
             try:
                 q = float(in_qtd.value.replace(",", "."))
                 cursor = db.cursor()
@@ -40,77 +45,79 @@ def main(page: ft.Page):
                                (sessao["user"], p, q, q*pr))
                 db.commit()
                 in_qtd.value = ""
-                page.update()
-            except: pass
+                mostrar_aviso(f"Venda de {p} salva!", "green")
+            except: mostrar_aviso("Valor inválido", "red")
 
         return ft.Column([
-            ft.Text("VENDAS", weight="bold", color=COR_BANANA),
+            ft.Text("LANÇAR PRODUÇÃO", size=18, weight="bold"),
             in_qtd,
-            ft.Row([
-                ft.ElevatedButton("CACAU", on_click=lambda _: salvar("Cacau", 600)),
-                ft.ElevatedButton("BANANA", on_click=lambda _: salvar("Banana", 50)),
-            ])
-        ])
+            ft.ElevatedButton("CACAU (R$ 600)", on_click=lambda _: salvar("Cacau", 600), bgcolor=COR_CACAU, color="white", width=250),
+            ft.ElevatedButton("BANANA (R$ 50)", on_click=lambda _: salvar("Banana", 50), bgcolor=COR_BANANA, color="black", width=250),
+        ], horizontal_alignment="center")
 
     def view_equipe():
         cursor = db.cursor()
         cursor.execute("SELECT id, login FROM usuarios WHERE cargo = 'pendente'")
         pendentes = cursor.fetchall()
-        col = ft.Column([ft.Text("PEDIDOS DE ACESSO", color=COR_BANANA)])
+        
+        lista = ft.Column([ft.Text("APROVAR NOVOS", weight="bold", color=COR_BANANA)])
         for p in pendentes:
-            col.controls.append(ft.Row([
+            def aprovar(e, idx=p[0]):
+                cursor.execute("UPDATE usuarios SET cargo = 'operador' WHERE id = ?", (idx,))
+                db.commit()
+                navegar("equipe")
+
+            lista.controls.append(ft.Row([
                 ft.Text(p[1]),
-                ft.TextButton("ACEITAR", on_click=lambda _, idx=p[0]: alterar_status(idx, "operador"))
-            ]))
-        return col
+                ft.TextButton("LIBERAR", on_click=aprovar)
+            ], alignment="center"))
+        return lista
 
     def view_planilha():
         cursor = db.cursor()
-        cursor.execute("SELECT user, produto, qtd, valor FROM lancamentos ORDER BY id DESC")
+        cursor.execute("SELECT user, produto, qtd, valor FROM lancamentos ORDER BY id DESC LIMIT 20")
         dados = cursor.fetchall()
-        tabela = ft.DataTable(
-            columns=[ft.DataColumn(ft.Text("Quem")), ft.DataColumn(ft.Text("Total"))],
-            rows=[ft.DataRow(cells=[ft.DataCell(ft.Text(str(d[0]))), ft.DataCell(ft.Text(f"R${d[3]:.2f}"))]) for d in dados]
-        )
+        
+        tabela = ft.Column([ft.Text("ÚLTIMOS LANÇAMENTOS", weight="bold")])
+        for d in dados:
+            tabela.controls.append(ft.Text(f"{d[0]} -> {d[1]} ({d[2]}): R$ {d[3]:.2f}", size=12))
         return ft.Column([tabela], scroll=ft.ScrollMode.ALWAYS)
 
-    # --- MONTAGEM DO SISTEMA (ESTRUTURA COMPATÍVEL) ---
+    # --- NAVEGAÇÃO ---
+    def navegar(destino):
+        conteudo_principal.controls.clear()
+        if destino == "vendas":
+            conteudo_principal.controls.append(view_vendas())
+        elif destino == "equipe":
+            conteudo_principal.controls.append(view_equipe())
+        elif destino == "planilha":
+            conteudo_principal.controls.append(view_planilha())
+        page.update()
+
     def montar_sistema():
         page.controls.clear()
         
-        # Criamos os conteúdos primeiro
-        cont_vendas = view_vendas()
-        cont_equipe = view_equipe()
-        cont_planilha = view_planilha()
-
-        # Escondemos todos
-        cont_equipe.visible = False
-        cont_planilha.visible = False
-
-        def mudar_aba(e):
-            idx = e.control.selected_index
-            cont_vendas.visible = (idx == 0)
-            cont_equipe.visible = (idx == 1) if sessao["cargo"] == "ceo" else False
-            cont_planilha.visible = (idx == 2) if sessao["cargo"] == "ceo" else False
-            page.update()
-
-        abas = [ft.Tab(label="VENDAS")]
+        # Menu Superior feito com botões simples (Zero erro de versão)
+        menu_botoes = [
+            ft.ElevatedButton("VENDAS", on_click=lambda _: navegar("vendas"), bgcolor="#1a1a1a"),
+        ]
+        
         if sessao["cargo"] == "ceo":
-            abas.append(ft.Tab(label="EQUIPE"))
-            abas.append(ft.Tab(label="PLANILHA"))
+            menu_botoes.append(ft.ElevatedButton("EQUIPE", on_click=lambda _: navegar("equipe"), bgcolor="#1a1a1a"))
+            menu_botoes.append(ft.ElevatedButton("PLANILHA", on_click=lambda _: navegar("planilha"), bgcolor="#1a1a1a"))
 
-        # No Flet antigo, a Tab não tem 'content'. 
-        # A gente coloca as Tabs em cima e os Columns embaixo.
         page.add(
-            ft.Row([ft.Text("SENNA", color=COR_BANANA, size=20, weight="bold")]),
-            ft.Tabs(tabs=abas, on_change=mudar_aba),
-            cont_vendas,
-            cont_equipe,
-            cont_planilha
+            ft.Row([
+                ft.Text("SENNA", size=22, weight="bold", color=COR_BANANA),
+                ft.TextButton("SAIR", on_click=lambda _: page.window_destroy())
+            ], alignment="spaceBetween"),
+            ft.Row(menu_botoes, scroll=ft.ScrollMode.ALWAYS),
+            ft.Divider(color="#333333"),
+            conteudo_principal
         )
-        page.update()
+        navegar("vendas")
 
-    # --- LOGIN ---
+    # --- TELA DE LOGIN ---
     def logar(e):
         cursor = db.cursor()
         cursor.execute("SELECT login, cargo FROM usuarios WHERE login = ? AND senha = ?", (ui_user.value, ui_pass.value))
@@ -118,10 +125,19 @@ def main(page: ft.Page):
         if res:
             sessao["user"], sessao["cargo"] = res[0], res[1]
             montar_sistema()
+        else: mostrar_aviso("Usuário ou senha incorretos", "red")
 
-    ui_user = ft.TextField(label="Usuário")
-    ui_pass = ft.TextField(label="Senha", password=True)
-    page.add(ft.Column([ft.Text("LOGIN"), ui_user, ui_pass, ft.ElevatedButton("ENTRAR", on_click=logar)]))
+    ui_user = ft.TextField(label="Usuário", border_color=COR_BANANA)
+    ui_pass = ft.TextField(label="Senha", password=True, border_color=COR_BANANA)
+
+    page.add(
+        ft.Column([
+            ft.Text("SENNA AGRO", size=32, weight="bold", color=COR_BANANA),
+            ui_user, ui_pass,
+            ft.ElevatedButton("ENTRAR", on_click=logar, bgcolor=COR_BANANA, color="black", width=250),
+            ft.TextButton("CRIAR CONTA", on_click=lambda _: mostrar_aviso("Peça ao Shadow para cadastrar você.", "blue"))
+        ], horizontal_alignment="center")
+    )
 
 if __name__ == "__main__":
     ft.app(target=main, view=ft.AppView.WEB_BROWSER, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
